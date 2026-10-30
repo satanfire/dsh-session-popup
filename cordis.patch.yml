@@ -1,0 +1,14 @@
+# dsh-session-popup — dsh bundle patch.
+#
+# One row: this package's own Host half. Mounting the row is what makes the
+# package discoverable by the client-module scanner (`dsh.client` is read from
+# the manifest of the package a Loader row mounts), so the browser half — the
+# popups themselves — is served with it.
+#
+# The Host half owns no behaviour: every trigger is a Client fact
+# (`uiSession.sessionStatus`), and every surface is a Client slot
+# (`shell.overlay`). Keep this row alone.
+
+- insert:
+    - id: session-popup
+      name: '@satanfire/dsh-session-popup'

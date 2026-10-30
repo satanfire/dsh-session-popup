@@ -1,0 +1,79 @@
+{
+  "name": "@satanfire/dsh-session-popup",
+  "version": "1.0.0",
+  "description": "会话通知弹窗：智能体需要你决策时在屏幕中央强提示，任务完成时在右上角弹卡片，当前会话的提示弱化为小角标。 · In-page session popups for DeepSeek Harness: a centred prompt when the agent needs a decision, a corner card when a task finishes.",
+  "type": "module",
+  "license": "MIT",
+  "author": "satanfire",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/satanfire/dsh-session-popup.git"
+  },
+  "homepage": "https://github.com/satanfire/dsh-session-popup#readme",
+  "bugs": {
+    "url": "https://github.com/satanfire/dsh-session-popup/issues"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "cordis",
+    "plugin",
+    "notification",
+    "popup",
+    "toast"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/en.json": "./locale/en.json",
+    "./locale/zh.json": "./locale/zh.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale",
+    "icon.svg",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "check": "node --check index.js && node --check client.js",
+    "test": "node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^30.1.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.2.0-rc.2"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh": {
+      "optional": true
+    }
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-api-session-controller",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-session",
+        "@deepseek-ai/dsh-client-ui-workspace"
+      ]
+    }
+  }
+}
