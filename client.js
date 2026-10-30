@@ -69,15 +69,11 @@ window.__ModuleLoader__.load({
         'decision.more': '{count} more sessions are waiting',
         'decision.one': '1 more session is waiting',
         'completion.title': 'Task finished',
-        'completion.body': 'This session has gone idle.',
-        'completion.open': 'View',
         'muted.decision': 'Pending',
         'muted.completion': 'Done',
         'muted.one': '{count} update',
         'muted.many': '{count} updates',
         'close': 'Close',
-        'kind.decision': 'Waiting for you',
-        'kind.completion': 'Finished',
       },
       zh: {
         'decision.title': '需要你处理',
@@ -87,15 +83,11 @@ window.__ModuleLoader__.load({
         'decision.more': '还有 {count} 个会话在等你',
         'decision.one': '还有 1 个会话在等你',
         'completion.title': '任务完成',
-        'completion.body': '这个会话已经空闲。',
-        'completion.open': '查看',
         'muted.decision': '待处理',
         'muted.completion': '已完成',
         'muted.one': '{count} 条更新',
         'muted.many': '{count} 条更新',
         'close': '关闭',
-        'kind.decision': '等你处理',
-        'kind.completion': '已完成',
       },
     };
 
@@ -108,23 +100,27 @@ window.__ModuleLoader__.load({
      * both follow the active theme without a second rule set.
      */
     const CSS = `
-      .dsh-sp-layer { position:fixed; inset:0; z-index:2147483000; pointer-events:none;
+      .dsh-sp-layer { position:absolute; inset:0; z-index:1; pointer-events:none;
         font-family:inherit; font-size:13px; line-height:19px;
         -webkit-font-smoothing:antialiased; }
       .dsh-sp-layer * { box-sizing:border-box; }
 
       /* ---- centred decision dialog ---- */
 
-      .dsh-sp-scrim { position:fixed; inset:0; pointer-events:auto; background:rgba(12,14,18,.42);
+      .dsh-sp-scrim { position:absolute; inset:0; pointer-events:auto;
+        background:var(--dsw-alias-bg-mask-1, rgba(12,14,18,.42));
         animation:dsh-sp-fade .14s ease-out both; }
-      .dsh-sp-scrim[data-quiet] { background:rgba(12,14,18,.26); }
 
-      .dsh-sp-dialog-wrap { position:fixed; inset:0; display:flex; align-items:center;
-        justify-content:center; padding:24px; pointer-events:none; }
+      .dsh-sp-dialog-wrap { position:absolute; inset:0; display:flex; align-items:center;
+        justify-content:center; pointer-events:none;
+        padding:max(24px, var(--dsh-frame-overlay-top, 24px)) 24px; }
       .dsh-sp-dialog { pointer-events:auto; position:relative; width:min(480px,100%);
-        max-height:calc(100vh - 48px); overflow:auto; border-radius:12px;
-        border:1px solid var(--dsw-alias-border-l2); background:var(--dsw-alias-bg-overlay);
-        box-shadow:0 20px 48px rgba(0,0,0,.34), 0 2px 8px rgba(0,0,0,.18);
+        max-height:calc(100% - 48px); overflow:auto;
+        border-radius:var(--dsw-radius-lg, 12px);
+        border:1px solid var(--dsw-alias-border-l2);
+        background:var(--dsw-alias-bg-layer-2, var(--dsw-alias-bg-overlay));
+        box-shadow:var(--dsw-elevation-prominent, 0 20px 48px rgba(0,0,0,.34));
+        -webkit-app-region:no-drag;
         padding:20px 20px 16px; animation:dsh-sp-pop .16s cubic-bezier(.2,.8,.3,1) both;
         color:var(--dsw-alias-label-primary); }
       .dsh-sp-dialog:focus { outline:none; }
@@ -177,17 +173,20 @@ window.__ModuleLoader__.load({
 
       /* ---- corner stack ---- */
 
-      .dsh-sp-corner { position:fixed; top:14px; right:14px; display:flex;
+      .dsh-sp-corner { position:absolute; top:max(14px, var(--dsh-frame-overlay-top, 14px));
+        right:14px; display:flex;
         flex-direction:column; align-items:flex-end; gap:8px;
         max-width:min(360px, calc(100vw - 28px)); pointer-events:none; }
 
       .dsh-sp-card { pointer-events:auto; position:relative; width:min(340px, calc(100vw - 28px));
-        border-radius:10px; border:1px solid var(--dsw-alias-border-l2);
-        background:var(--dsw-alias-bg-overlay); padding:11px 34px 11px 12px;
-        box-shadow:0 10px 26px rgba(0,0,0,.24), 0 1px 3px rgba(0,0,0,.14);
+        border-radius:var(--dsw-radius-md, 10px);
+        border:1px solid var(--dsw-alias-border-l2);
+        background:var(--dsw-alias-bg-layer-2, var(--dsw-alias-bg-overlay));
+        padding:11px 34px 11px 12px;
+        box-shadow:var(--dsw-elevation-prominent, 0 10px 26px rgba(0,0,0,.24));
         animation:dsh-sp-slide .18s cubic-bezier(.2,.8,.3,1) both;
+        -webkit-app-region:no-drag;
         color:var(--dsw-alias-label-primary); }
-      .dsh-sp-card:hover { border-color:var(--dsw-alias-border-l2); }
       .dsh-sp-card[data-clickable] { cursor:pointer; }
       .dsh-sp-card-row { display:flex; align-items:flex-start; gap:9px; min-width:0;
         border-radius:5px; }
@@ -214,15 +213,19 @@ window.__ModuleLoader__.load({
       .dsh-sp-card-close svg { width:11px; height:11px; display:block; }
       .dsh-sp-card-progress { position:absolute; left:0; bottom:0; height:2px;
         border-radius:0 0 0 10px; background:var(--dsw-alias-state-success-primary); opacity:.5; }
+      .dsh-sp-card-progress[data-held] { animation-play-state:paused; }
 
       /* ---- muted pill ---- */
 
       .dsh-sp-pill { pointer-events:auto; display:inline-flex; align-items:center; gap:6px;
         border-radius:999px; border:1px solid var(--dsw-alias-border-l2);
-        background:var(--dsw-alias-bg-overlay); color:var(--dsw-alias-label-secondary);
+        background:var(--dsw-alias-bg-layer-2, var(--dsw-alias-bg-overlay));
+        color:var(--dsw-alias-label-secondary);
         font:inherit; font-size:12px; line-height:16px; padding:4px 10px 4px 8px;
-        cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.16);
-        animation:dsh-sp-slide .18s cubic-bezier(.2,.8,.3,1) both; }
+        cursor:pointer;
+        box-shadow:var(--dsw-elevation-panel, 0 4px 14px rgba(0,0,0,.16));
+        animation:dsh-sp-slide .18s cubic-bezier(.2,.8,.3,1) both;
+        -webkit-app-region:no-drag; }
       .dsh-sp-pill:hover { color:var(--dsw-alias-label-primary);
         border-color:var(--dsw-alias-border-l2); background:var(--dsw-alias-bg-layer-2); }
       .dsh-sp-pill:focus-visible { outline:2px solid var(--dsw-alias-brand-primary); outline-offset:2px; }
@@ -243,7 +246,7 @@ window.__ModuleLoader__.load({
         .dsh-sp-scrim, .dsh-sp-dialog, .dsh-sp-card, .dsh-sp-pill { animation:none; }
       }
       @media (max-width:520px) {
-        .dsh-sp-corner { top:10px; right:10px; }
+        .dsh-sp-corner { top:max(10px, var(--dsh-frame-overlay-top, 10px)); right:10px; }
         .dsh-sp-dialog { padding:18px 16px 14px; }
       }
     `;
@@ -298,7 +301,14 @@ window.__ModuleLoader__.load({
           return items;
         },
         add(notice) {
-          const kept = items.length >= NOTICE_LIMIT ? items.slice(items.length - NOTICE_LIMIT + 1) : items;
+          // Evict a completion before a decision: the decision may be the dialog
+          // currently on screen, and dropping it would silently hide a blocking
+          // prompt while the user is reading it.
+          let kept = items;
+          if (kept.length >= NOTICE_LIMIT) {
+            const victim = kept.find((item) => item.kind !== 'decision') ?? kept[0];
+            kept = kept.filter((item) => item !== victim);
+          }
           replace([...kept, notice]);
         },
         remove(id) {
@@ -399,8 +409,8 @@ window.__ModuleLoader__.load({
      */
     function sessionTitle(ctx, sessionId) {
       const row = ctx.sessions?.list?.getSnapshot()?.byId?.[sessionId];
-      const title = row?.displayTitle || row?.title || '';
-      return clamp(title.trim() === '' ? String(sessionId).slice(0, 8) : title, TITLE_MAX);
+      const title = (row?.displayTitle || row?.title || '').trim();
+      return clamp(title === '' ? String(sessionId).slice(0, 8) : title, TITLE_MAX);
     }
 
     /**
@@ -425,6 +435,26 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * Whether an interaction genuinely wants an answer right now.
+     *
+     * `pendingInteraction` is not always a live prompt. The user-questions
+     * plugin publishes a READ-ONLY review card into the same slot when the user
+     * opens a finished question to read its answer; that card carries `review`
+     * and has no answer channel. Alerting on it would pop a blocking dialog for
+     * something the user is merely re-reading.
+     *
+     * `null` counts as absent for the same reason `undefined` does: both mean
+     * "nothing is waiting", and treating only one of them as absent is how a
+     * dialog ends up unable to withdraw.
+     *
+     * @param interaction - candidate pending interaction.
+     * @returns whether the interaction blocks on the user.
+     */
+    function isAnswerable(interaction) {
+      return interaction !== undefined && interaction !== null && interaction.review === undefined;
+    }
+
+    /**
      * Diff two `sessionStatus` snapshots into alert edges.
      *
      * Two rules, each firing once:
@@ -443,9 +473,9 @@ window.__ModuleLoader__.load({
       const edges = [];
       if (!(next instanceof Map)) return edges;
       for (const [sessionId, status] of next) {
-        const before = previous?.get(sessionId);
+        const before = previous instanceof Map ? previous.get(sessionId) : undefined;
         const interaction = status?.pendingInteraction;
-        if (interaction !== undefined && interaction !== null && interaction !== before?.pendingInteraction) {
+        if (isAnswerable(interaction) && interaction !== before?.pendingInteraction) {
           edges.push({ kind: 'decision', sessionId, interaction });
         }
         if (previous !== undefined && before?.running === true && status?.running !== true) {
@@ -506,8 +536,39 @@ window.__ModuleLoader__.load({
     function DecisionDialog({ notice, moreCount, t, onOpen, onDismiss }) {
       const dialogRef = React.useRef(null);
 
+      // Move focus in, keep Tab inside while the scrim is up, and put focus back
+      // where it was on the way out. `aria-modal` claims the page behind is
+      // inert, so Tab must not walk into controls the user cannot see.
       React.useEffect(() => {
         dialogRef.current?.focus();
+        return undefined;
+        /* TEMP-DISABLED
+        const node = dialogRef.current;
+        if (node === null) return undefined;
+        const returnTo = document.activeElement;
+        node.focus();
+        const onKeyDown = (event) => {
+          if (event.key !== 'Tab') return;
+          const stops = node.querySelectorAll(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+          );
+          if (stops.length === 0) return;
+          const first = stops[0];
+          const last = stops[stops.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        };
+        node.addEventListener('keydown', onKeyDown);
+        return () => {
+          node.removeEventListener('keydown', onKeyDown);
+          if (returnTo !== null && typeof returnTo.focus === 'function') returnTo.focus();
+        };
+        */
       }, [notice.id]);
 
       React.useEffect(() => {
@@ -522,6 +583,7 @@ window.__ModuleLoader__.load({
       }, [notice.id, onDismiss]);
 
       const detail = notice.detail === '' ? t('decision.body') : notice.detail;
+      const detailId = `dsh-sp-detail-${notice.id}`;
       const more =
         moreCount > 1 ? t(moreCount === 2 ? 'decision.one' : 'decision.more', { count: moreCount - 1 }) : '';
 
@@ -540,6 +602,7 @@ window.__ModuleLoader__.load({
               role: 'alertdialog',
               'aria-modal': 'true',
               'aria-labelledby': `dsh-sp-title-${notice.id}`,
+              'aria-describedby': detailId,
               tabIndex: -1,
             },
             h(
@@ -564,7 +627,7 @@ window.__ModuleLoader__.load({
                 h('p', { className: 'dsh-sp-session' }, notice.title),
               ),
             ),
-            h('p', { className: 'dsh-sp-detail' }, detail),
+            h('p', { className: 'dsh-sp-detail', id: detailId }, detail),
             h(
               'div',
               { className: 'dsh-sp-actions' },
@@ -598,19 +661,33 @@ window.__ModuleLoader__.load({
     /**
      * One corner card for a finished task.
      *
-     * The countdown lives here rather than in the store so a hover can hold it:
-     * the timer is torn down while the pointer rests on the card and restarted
-     * on leave.
+     * The countdown lives here rather than in the store so a hover can hold it.
+     * It is a genuine hold, not a restart: the remaining milliseconds are saved
+     * on leave and only those are waited out, and the progress bar is paused in
+     * place rather than remounted at full width.
      *
      * @param props - component props.
      * @returns the card.
      */
     function CompletionCard({ notice, t, onOpen, onDismiss }) {
       const [held, setHeld] = React.useState(false);
+      const deadline = React.useRef(Date.now() + COMPLETION_TTL_MS);
+      const remaining = React.useRef(COMPLETION_TTL_MS);
+      const reduceMotion = React.useMemo(
+        () =>
+          typeof window !== 'undefined' &&
+          typeof window.matchMedia === 'function' &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+        [],
+      );
 
       React.useEffect(() => {
-        if (held) return undefined;
-        const timer = setTimeout(() => onDismiss(notice.id), COMPLETION_TTL_MS);
+        if (held) {
+          remaining.current = Math.max(0, deadline.current - Date.now());
+          return undefined;
+        }
+        deadline.current = Date.now() + remaining.current;
+        const timer = setTimeout(() => onDismiss(notice.id), remaining.current);
         return () => clearTimeout(timer);
       }, [held, notice.id, onDismiss]);
 
@@ -660,10 +737,15 @@ window.__ModuleLoader__.load({
           },
           icon(ICON_CLOSE),
         ),
-        held
+        // The bar is paused in place, never remounted: remounting restarts it at
+        // full width and makes a hold look like a reset. Skipped entirely for a
+        // reduced-motion user, whose stylesheet opt-out cannot reach an inline
+        // animation.
+        reduceMotion
           ? null
           : h('div', {
               className: 'dsh-sp-card-progress',
+              'data-held': held ? '' : undefined,
               style: { animation: `dsh-sp-drain ${COMPLETION_TTL_MS}ms linear both` },
             }),
       );
@@ -740,7 +822,7 @@ window.__ModuleLoader__.load({
             }),
         h(
           'div',
-          { className: 'dsh-sp-corner' },
+          { className: 'dsh-sp-corner', role: 'status', 'aria-live': 'polite' },
           muted.length === 0 ? null : h(MutedPill, { key: 'pill', notices: muted, t, onOpen: onOpenMuted }),
           stacked.map((notice) =>
             h(CompletionCard, { key: notice.id, notice, t, onOpen, onDismiss }),
@@ -787,11 +869,11 @@ window.__ModuleLoader__.load({
         };
 
         ctx.effect(() => {
-          const en = ctx.locale.register(NS, 'en', COPY.en);
-          const zh = ctx.locale.register(NS, 'zh', COPY.zh);
+          // Register into locals first: if the second call throws, the first
+          // registration still has a disposer to run.
+          const registered = [ctx.locale.register(NS, 'en', COPY.en), ctx.locale.register(NS, 'zh', COPY.zh)];
           return () => {
-            zh?.();
-            en?.();
+            for (const dispose of registered.reverse()) dispose?.();
           };
         }, 'dsh-session-popup: dictionaries');
 
@@ -815,14 +897,16 @@ window.__ModuleLoader__.load({
           const read = () => {
             const next = source.getSnapshot();
 
-            // A decision notice is only meaningful while that interaction is
-            // still open. Once the Host reports it settled — answered anywhere,
-            // including in another window — the dialog must go away rather than
-            // keep asking for an answer that was already given.
+            // A decision notice is only meaningful while that interaction still
+            // wants an answer. Once the Host reports it settled — answered
+            // anywhere, including in another window — the dialog must go away
+            // rather than keep asking for an answer that was already given.
+            // The same predicate as the edge test, so `null` and a read-only
+            // review card both withdraw instead of parking a dead dialog.
             store.removeWhere(
               (notice) =>
                 notice.kind === 'decision' &&
-                (next instanceof Map ? next.get(notice.sessionId)?.pendingInteraction : undefined) === undefined,
+                !isAnswerable(next instanceof Map ? next.get(notice.sessionId)?.pendingInteraction : undefined),
             );
 
             for (const edge of diffStatus(previous, next)) {
@@ -851,9 +935,21 @@ window.__ModuleLoader__.load({
                 title: sessionTitle(ctx, edge.sessionId),
                 detail: edge.kind === 'decision' ? interactionDetail(edge.interaction) : '',
                 muted: isCurrentSession(ctx, edge.sessionId),
-                createdAt: Date.now(),
               });
             }
+
+
+            // Dismissal timers live in the card components, and only rendered
+            // cards mount one. A card pushed out of the visible stack would
+            // therefore keep its notice forever and reappear — with a fresh
+            // countdown — once the stack drained. Retire the overflow here, at
+            // the one place that knows which cards are still on screen.
+            const live = store
+              .getSnapshot()
+              .filter((notice) => notice.kind === 'completion' && notice.muted !== true);
+            const overflow = live.length - MAX_COMPLETION_CARDS;
+            for (const stale of live.slice(0, Math.max(0, overflow))) store.remove(stale.id);
+
             previous = next;
           };
 

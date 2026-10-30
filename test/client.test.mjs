@@ -294,3 +294,27 @@ test('alert: a completion for a background session still raises a card', () => {
   assert.ok(html.includes('dsh-sp-card'));
   assert.ok(html.includes('T-sess-alpha'));
 });
+
+test('quiet: a read-only review card is not a decision', () => {
+  // Opening a finished question renders a review card into the same slot, with
+  // no answer channel. It must not raise a blocking dialog.
+  const { state, t } = mount({
+    status: new Map([
+      [SID, row({ pendingInteraction: { review: {}, questions: [{ question: 'Old question' }] } })],
+    ]),
+  });
+  const html = render(state, t);
+  assert.equal(html.includes('role="alertdialog"'), false);
+});
+
+test('lifecycle: a null interaction withdraws the dialog', () => {
+  // `null` and `undefined` both mean "nothing waiting"; only treating one as
+  // absent is how a dialog ends up unable to withdraw.
+  const { state, t } = mount({
+    status: new Map([[SID, row({ pendingInteraction: question('Still there?') })]]),
+  });
+  assert.ok(render(state, t).includes('role="alertdialog"'));
+
+  drive(state, [new Map([[SID, row({ pendingInteraction: null })]])]);
+  assert.equal(render(state, t).includes('role="alertdialog"'), false);
+});

@@ -13,7 +13,13 @@
  * @module @satanfire/dsh-session-popup
  */
 
-/** Diagnostic name of this Host plugin. Matches the patch row id. */
+/**
+ * Diagnostic name of this Host plugin, used in logs and disposal labels.
+ *
+ * It is deliberately not the Loader row id: the row in `cordis.patch.yml` is
+ * the shorter `session-popup`, and patch layers target that id. This name is
+ * only what the plugin reports about itself.
+ */
 export const name = 'dsh-session-popup';
 
 /**

@@ -174,3 +174,20 @@ test('card: it dismisses itself once the countdown elapses', (t) => {
   assert.equal(view.container.querySelector('.dsh-sp-card'), null);
   view.unmount();
 });
+
+test('card: a card pushed out of the stack is retired, not replayed', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const ids = ['a', 'b', 'c', 'd'];
+  const view = mount({ status: new Map(ids.map((id) => [id, row({ running: true })])) });
+
+  view.push(new Map(ids.map((id) => [id, row({ running: false })])));
+  assert.equal(view.container.querySelectorAll('.dsh-sp-card').length, 3, 'only three are shown');
+
+  // Let every visible card expire. The fourth must NOT come back: its notice was
+  // retired when it lost its slot, so nothing is left holding a timer.
+  act(() => {
+    t.mock.timers.tick(9000);
+  });
+  assert.equal(view.container.querySelectorAll('.dsh-sp-card').length, 0);
+  view.unmount();
+});
