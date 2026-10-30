@@ -57,7 +57,60 @@ function interpolate(raw, params) {
  * @returns the plugin definition, capture buffers, and an instantiator.
  */
 export function loadPlugin(env = {}) {
-  const captured = { styles: [], listeners: {} };
+  const captured = { styles: [], listeners: {}, frequencies: [], contexts: 0, closed: 0 };
+  const audio = env.audio ?? {};
+
+  // A recording stand-in for Web Audio. jsdom has none, and the tone scheduler
+  // is exactly the kind of code that is easy to get wrong (a suspended context
+  // banks every alert onto a frozen timeline), so it is worth observing.
+  class FakeGain {
+    constructor() {
+      this.gain = { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {} };
+    }
+    connect() {}
+    disconnect() {}
+  }
+
+  class FakeOscillator {
+    constructor() {
+      this.type = 'sine';
+      this.frequency = {
+        setValueAtTime: (value) => {
+          captured.frequencies.push(value);
+        },
+        exponentialRampToValueAtTime() {},
+      };
+    }
+    connect() {}
+    start() {}
+    stop() {}
+  }
+
+  class FakeAudioContext {
+    constructor() {
+      this.state = audio.state ?? 'running';
+      this.currentTime = 0;
+      this.destination = new FakeGain();
+      captured.contexts += 1;
+    }
+    createGain() {
+      return new FakeGain();
+    }
+    createOscillator() {
+      return new FakeOscillator();
+    }
+    resume() {
+      // A gesture is what really resumes a suspended context; `resumeResolves:
+      // false` models the never-unlocked case.
+      if (audio.resumeResolves === false) return new Promise(() => {});
+      this.state = 'running';
+      return Promise.resolve();
+    }
+    close() {
+      this.state = 'closed';
+      captured.closed += 1;
+    }
+  }
 
   const fakeWindow = env.window ?? {
     __ModuleLoader__: {
@@ -65,6 +118,7 @@ export function loadPlugin(env = {}) {
         this.current = definition;
       },
     },
+    ...(env.audio === false ? {} : { AudioContext: FakeAudioContext }),
     addEventListener(type, handler) {
       (captured.listeners[type] ??= []).push(handler);
     },
@@ -91,6 +145,15 @@ export function loadPlugin(env = {}) {
     },
     createElement(tag) {
       return { tag, textContent: '', dataset: {}, remove() {} };
+    },
+    // The audio-unlock effect listens on the document for the first gesture.
+    addEventListener(type, handler) {
+      (captured.listeners[`document:${type}`] ??= []).push(handler);
+    },
+    removeEventListener(type, handler) {
+      const list = captured.listeners[`document:${type}`] ?? [];
+      const index = list.indexOf(handler);
+      if (index >= 0) list.splice(index, 1);
     },
   };
 

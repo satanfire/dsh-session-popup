@@ -1,7 +1,7 @@
 {
   "name": "@satanfire/dsh-session-popup",
   "version": "1.0.0",
-  "description": "会话通知弹窗：智能体需要你决策时在屏幕中央强提示，任务完成时在右上角弹卡片，当前会话的提示弱化为小角标。 · In-page session popups for DeepSeek Harness: a centred prompt when the agent needs a decision, a corner card when a task finishes.",
+  "description": "会话通知：智能体需要你决策时屏幕中央弹窗并响一声，任务完成时右上角卡片加轻提示音，当前会话弱化为小角标。 · Session alerts for DeepSeek Harness: a centred prompt plus chime when the agent needs a decision, a corner card plus light tone when a task finishes.",
   "type": "module",
   "license": "MIT",
   "author": "satanfire",
@@ -20,7 +20,7 @@
     "plugin",
     "notification",
     "popup",
-    "toast"
+    "audio"
   ],
   "engines": {
     "node": ">=22"

@@ -237,6 +237,7 @@ test('lifecycle: every effect is disposable', () => {
   assert.deepEqual(labels, [
     'dsh-session-popup: dictionaries',
     'dsh-session-popup: styles',
+    'dsh-session-popup: audio unlock',
     'dsh-session-popup: status triggers',
   ]);
 });
@@ -317,4 +318,74 @@ test('lifecycle: a null interaction withdraws the dialog', () => {
 
   drive(state, [new Map([[SID, row({ pendingInteraction: null })]])]);
   assert.equal(render(state, t).includes('role="alertdialog"'), false);
+});
+
+// --- sound ---
+//
+// The tones are synthesized, so the harness records the frequencies each
+// oscillator is scheduled at. A decision tone opens on 659.25 Hz, a completion
+// tone on 587.33 Hz; three notes each.
+
+test('sound: a decision schedules the decision tone', () => {
+  const { loaded } = mount({
+    status: new Map([[SID, row({ pendingInteraction: question('Run it?') })]]),
+  });
+  assert.equal(loaded.captured.frequencies.length, 3);
+  assert.equal(loaded.captured.frequencies[0], 659.25);
+});
+
+test('sound: a background completion schedules the completion tone', () => {
+  const { state, loaded } = mount({
+    sessions: sessions({ [SID]: 0, [OTHER]: 1 }),
+    status: new Map([[SID, row({ running: true })]]),
+  });
+  drive(state, [new Map([[SID, row({ running: false })]])]);
+  assert.equal(loaded.captured.frequencies.length, 3);
+  assert.equal(loaded.captured.frequencies[0], 587.33);
+});
+
+test('sound: a completion for the session on screen still chimes', () => {
+  // No visual alert, but the turn-over cue must still be audible.
+  const { state, loaded } = mount({
+    sessions: sessions({ [SID]: 1 }),
+    status: new Map([[SID, row({ running: true })]]),
+  });
+  drive(state, [new Map([[SID, row({ running: false })]])]);
+  assert.equal(loaded.captured.frequencies.length, 3);
+});
+
+test('sound: a subagent stays silent', () => {
+  const { state, loaded } = mount({
+    sessions: sessions({ [SID]: { origin: 'subagent' } }),
+    status: new Map([[SID, row({ running: true })]]),
+  });
+  drive(state, [new Map([[SID, row({ running: false })]])]);
+  assert.equal(loaded.captured.frequencies.length, 0);
+});
+
+test('sound: a suspended context banks nothing until a gesture resumes it', () => {
+  // Scheduling on a frozen timeline would fire every missed alert at once when
+  // the context finally resumes. Nothing may be scheduled while suspended.
+  const loaded = loadPlugin({ audio: { state: 'suspended', resumeResolves: false } });
+  const { ctx, state } = makeContext({
+    status: new Map([[SID, row({ pendingInteraction: question('Run it?') })]]),
+  });
+  loaded.instantiate().apply(ctx);
+
+  assert.equal(loaded.captured.contexts, 1, 'the context was created');
+  assert.equal(loaded.captured.frequencies.length, 0, 'nothing was scheduled');
+  assert.equal(state.slots.length, 1, 'the dialog still appears');
+});
+
+test('sound: no Web Audio at all is silent, not fatal', () => {
+  // A browser (or test runner) without AudioContext must degrade to a visual
+  // alert, never to a thrown exception inside the status subscription.
+  const loaded = loadPlugin({ audio: false });
+  const { ctx, state } = makeContext({
+    status: new Map([[SID, row({ pendingInteraction: question('Run it?') })]]),
+  });
+  loaded.instantiate().apply(ctx);
+  assert.equal(loaded.captured.contexts, 0, 'no context was built');
+  assert.equal(loaded.captured.frequencies.length, 0);
+  assert.equal(state.slots.length, 1, 'the dialog still appears');
 });

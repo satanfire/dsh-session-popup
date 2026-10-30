@@ -51,6 +51,143 @@ window.__ModuleLoader__.load({
     const DETAIL_MAX = 220;
     /** Longest session title rendered, in characters. */
     const TITLE_MAX = 60;
+    /** Alert loudness in percent, 0–100. This plugin has no volume slider. */
+    const VOLUME_PERCENT = 40;
+
+    //#endregion
+
+    //#region sound
+
+    /**
+     * The two alert tones, synthesized with Web Audio — no audio assets, so the
+     * package stays a couple of text files and nothing is downloaded.
+     *
+     * `at` is the start offset in seconds, `dur` the decay length, `gain` the
+     * relative level, `type` the waveform. Octave partials (`bell`-style pairs)
+     * give a tone body without samples.
+     *
+     * `decision` rises through a major triad: it is the one that must cut
+     * through. `completion` is a short triangle-wave arpeggio: audible, but it
+     * plays at the end of every turn, so it has to stay light.
+     */
+    const TONES = {
+      decision: [
+        { freq: 659.25, at: 0, dur: 0.42, gain: 0.85 },
+        { freq: 830.61, at: 0.13, dur: 0.46, gain: 0.9 },
+        { freq: 987.77, at: 0.26, dur: 0.62, gain: 1 },
+      ],
+      completion: [
+        { freq: 587.33, at: 0, dur: 0.1, gain: 0.7, type: 'triangle' },
+        { freq: 739.99, at: 0.08, dur: 0.1, gain: 0.75, type: 'triangle' },
+        { freq: 880, at: 0.16, dur: 0.42, gain: 0.85, type: 'triangle' },
+      ],
+    };
+
+    /** The page's AudioContext, created on first use and reused afterwards. */
+    let audioEngine;
+
+    /**
+     * Resolve the page's AudioContext, creating it on first use.
+     *
+     * @returns the context, or undefined where the browser offers none (or a
+     *   test environment has no Web Audio).
+     */
+    function audioContext() {
+      if (typeof window === 'undefined') return undefined;
+      const Ctor = window.AudioContext ?? window.webkitAudioContext;
+      if (typeof Ctor !== 'function') return undefined;
+      if (audioEngine === undefined) audioEngine = new Ctor();
+      return audioEngine;
+    }
+
+    /**
+     * Run `play` on an AudioContext that is actually running.
+     *
+     * A suspended context has a FROZEN `currentTime`, so sources scheduled on
+     * it park on the timeline and fire together whenever the context later
+     * resumes — every missed alert arriving at once. Nothing is scheduled while
+     * suspended; the unlock effect below makes the next alert work instead.
+     *
+     * @param engine - the page's AudioContext.
+     * @param play - schedules the tone.
+     */
+    function whenRunning(engine, play) {
+      if (engine.state === 'running') {
+        play(engine);
+        return;
+      }
+      Promise.resolve(engine.resume())
+        .then(() => {
+          if (engine.state === 'running') play(engine);
+        })
+        .catch(() => {});
+    }
+
+    /**
+     * Play one alert tone.
+     *
+     * Every failure mode is silent: an alert without audio is better than an
+     * exception thrown into the status subscription.
+     *
+     * @param kind - `decision` or `completion`.
+     */
+    function playTone(kind) {
+      const notes = TONES[kind];
+      if (notes === undefined) return;
+      const engine = audioContext();
+      if (engine === undefined) return;
+      const loudness = Math.max(0, Math.min(100, VOLUME_PERCENT)) / 100;
+      if (loudness === 0) return;
+      whenRunning(engine, (ctx) => {
+        try {
+          const master = ctx.createGain();
+          master.gain.value = loudness * 0.6;
+          master.connect(ctx.destination);
+          const origin = ctx.currentTime + 0.02;
+          let tail = 0;
+          for (const note of notes) {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = note.type ?? 'sine';
+            const start = origin + note.at;
+            osc.frequency.setValueAtTime(note.freq, start);
+            const peak = Math.max(0.0002, note.gain * 0.25);
+            gain.gain.setValueAtTime(0.0001, start);
+            gain.gain.exponentialRampToValueAtTime(peak, start + 0.012);
+            gain.gain.exponentialRampToValueAtTime(0.0001, start + note.dur);
+            osc.connect(gain);
+            gain.connect(master);
+            osc.start(start);
+            osc.stop(start + note.dur + 0.05);
+            tail = Math.max(tail, note.at + note.dur);
+          }
+          // Release the master node after the tail fades: a connected node is
+          // never collected, so leaving it wired would leak one node per alert.
+          const timer = setTimeout(() => {
+            try {
+              master.disconnect();
+            } catch {
+              // A context closed during teardown throws here; nothing to do.
+            }
+          }, Math.max(0, origin + tail + 0.1 - ctx.currentTime) * 1000 + 60);
+          timer?.unref?.();
+        } catch {
+          // A context that cannot build a graph simply stays quiet.
+        }
+      });
+    }
+
+    /** Drop the AudioContext so a reload builds a fresh one. */
+    function closeAudio() {
+      if (audioEngine === undefined) return;
+      const engine = audioEngine;
+      audioEngine = undefined;
+      try {
+        engine.close();
+      } catch {
+        // Already closed, or closing is unsupported.
+      }
+    }
 
     //#endregion
 
@@ -885,6 +1022,27 @@ window.__ModuleLoader__.load({
           return () => style.remove();
         }, 'dsh-session-popup: styles');
 
+        // Browsers gate Web Audio behind a user gesture: until one happens the
+        // context starts suspended and `resume()` stays pending. The first real
+        // gesture starts it and keeps it running; `whenRunning` then refuses to
+        // schedule anything while it is still suspended, so no alert is banked
+        // on a frozen timeline. The Desktop shell needs none of this — Electron
+        // starts audio without a gesture — which is why the problem is
+        // invisible there.
+        ctx.effect(() => {
+          if (typeof document === 'undefined') return closeAudio;
+          const unlock = () => {
+            const engine = audioContext();
+            if (engine?.state === 'suspended') engine.resume().catch(() => {});
+          };
+          const types = ['pointerdown', 'keydown', 'touchstart'];
+          for (const type of types) document.addEventListener(type, unlock, { capture: true, passive: true });
+          return () => {
+            for (const type of types) document.removeEventListener(type, unlock, { capture: true });
+            closeAudio();
+          };
+        }, 'dsh-session-popup: audio unlock');
+
         // The only writer: a Cordis effect on the shipped status snapshot. It
         // diffs edges and pushes notices into the store; nothing here touches
         // React, and React never writes back.
@@ -911,12 +1069,15 @@ window.__ModuleLoader__.load({
 
             for (const edge of diffStatus(previous, next)) {
               // Subagent children never alert on their own; the parent session
-              // is the one the user is actually working in.
+              // is the one the user is actually working in. Silent too: a
+              // sub-agent chime would sound with nothing on screen to explain it.
               if (!isAlertableSession(ctx, edge.sessionId)) continue;
 
-              // A completion for the session already on screen needs no alert:
-              // the answer is right there in the conversation being read. Left
-              // in, every single reply would raise a notice.
+              // The chime and the surface are deliberately not one-to-one. A run
+              // ending on the session you are reading makes no visual alert —
+              // the answer is right there — but it still gets one tone, which is
+              // the only cue you get that the turn is over while you look away.
+              playTone(edge.kind);
               if (edge.kind === 'completion' && isCurrentSession(ctx, edge.sessionId)) continue;
 
               if (edge.kind === 'decision') {
