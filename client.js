@@ -404,6 +404,27 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * Whether a session is one the user browses as its own thing.
+     *
+     * Subagent children carry `origin: 'subagent'` and the shipped sidebar hides
+     * them outright — they are an implementation detail of the session that
+     * spawned them. Alerting on one would surface a "task finished" card for a
+     * session the user cannot even select, so they are skipped entirely.
+     *
+     * An unknown session stays alertable: losing a real decision is worse than
+     * one extra card.
+     *
+     * @param ctx - client root context.
+     * @param sessionId - session to test.
+     * @returns whether the session may raise an alert.
+     */
+    function isAlertableSession(ctx, sessionId) {
+      const row = ctx.sessions?.list?.getSnapshot()?.byId?.[sessionId];
+      if (row === undefined || row === null) return true;
+      return row.origin !== 'subagent';
+    }
+
+    /**
      * Diff two `sessionStatus` snapshots into alert edges.
      *
      * Two rules, each firing once:
@@ -805,6 +826,15 @@ window.__ModuleLoader__.load({
             );
 
             for (const edge of diffStatus(previous, next)) {
+              // Subagent children never alert on their own; the parent session
+              // is the one the user is actually working in.
+              if (!isAlertableSession(ctx, edge.sessionId)) continue;
+
+              // A completion for the session already on screen needs no alert:
+              // the answer is right there in the conversation being read. Left
+              // in, every single reply would raise a notice.
+              if (edge.kind === 'completion' && isCurrentSession(ctx, edge.sessionId)) continue;
+
               if (edge.kind === 'decision') {
                 // A new interaction on the same session supersedes the old one:
                 // the Host would not report a second pending interaction while

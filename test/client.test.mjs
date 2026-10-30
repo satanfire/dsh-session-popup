@@ -44,15 +44,24 @@ function approval(overrides = {}) {
 }
 
 /**
- * A session list snapshot that marks one session as the visited one.
+ * A session list snapshot.
  *
- * @param overrides - per-session retention overrides.
+ * Each value is either a `mainView` count or a `{ mainView, origin, title }`
+ * descriptor.
+ *
+ * @param spec - per-session descriptors.
  * @returns the snapshot.
  */
-function sessions(overrides = {}) {
+function sessions(spec = {}) {
   const byId = {};
-  for (const [id, mainView] of Object.entries(overrides)) {
-    byId[id] = { id, displayTitle: `T-${id}`, retainedBy: { mainView } };
+  for (const [id, meta] of Object.entries(spec)) {
+    const options = typeof meta === 'number' ? { mainView: meta } : meta;
+    byId[id] = {
+      id,
+      displayTitle: options.title ?? `T-${id}`,
+      retainedBy: { mainView: options.mainView ?? 0 },
+      ...(options.origin === undefined ? {} : { origin: options.origin }),
+    };
   }
   return { phase: 'ready', ids: Object.keys(byId), byId };
 }
@@ -241,4 +250,47 @@ test('lifecycle: a settled decision withdraws its dialog', () => {
   // The interaction was answered somewhere else; the pending row is gone.
   drive(state, [new Map([[SID, row({ running: false })]])]);
   assert.equal(render(state, t).includes('role="alertdialog"'), false);
+});
+
+test('quiet: a completion for the session on screen raises nothing', () => {
+  // Every reply ends a run. Alerting on that would mean a notice per message.
+  const { state, t } = mount({
+    sessions: sessions({ [SID]: 1 }),
+    status: new Map([[SID, row({ running: true })]]),
+  });
+  drive(state, [new Map([[SID, row({ running: false })]])]);
+
+  const html = render(state, t);
+  assert.equal(html.includes('dsh-sp-card'), false);
+  assert.equal(html.includes('dsh-sp-pill'), false);
+});
+
+test('quiet: a subagent child never alerts', () => {
+  const { state, t } = mount({
+    sessions: sessions({ [SID]: { origin: 'subagent' } }),
+    status: new Map([[SID, row({ running: true })]]),
+  });
+  drive(state, [new Map([[SID, row({ running: false })]])]);
+
+  assert.equal(render(state, t).includes('dsh-sp-card'), false);
+});
+
+test('quiet: a subagent decision never alerts either', () => {
+  const { state, t } = mount({
+    sessions: sessions({ [SID]: { origin: 'subagent' } }),
+    status: new Map([[SID, row({ pendingInteraction: question('Internal?') })]]),
+  });
+  assert.equal(render(state, t).includes('role="alertdialog"'), false);
+});
+
+test('alert: a completion for a background session still raises a card', () => {
+  const { state, t } = mount({
+    sessions: sessions({ [SID]: 0, [OTHER]: 1 }),
+    status: new Map([[SID, row({ running: true })]]),
+  });
+  drive(state, [new Map([[SID, row({ running: false })]])]);
+
+  const html = render(state, t);
+  assert.ok(html.includes('dsh-sp-card'));
+  assert.ok(html.includes('T-sess-alpha'));
 });
